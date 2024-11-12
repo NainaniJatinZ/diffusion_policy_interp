@@ -14,3 +14,11 @@ __pycache__/
 
 # VS Code settings
 .vscode/
+
+data/*
+
+# all ckpt files
+*.ckpt
+
+# all log files
+sae/logs/*

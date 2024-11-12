@@ -1,4 +1,28 @@
 # %%
+
+import os 
+os.chdir("../")
+from sae.sae_model import SparseAutoencoder
+import torch 
+
+sae_path = "sae/results_layer4_dim2048_k64_auxk64_dead200/checkpoints/last.ckpt"
+
+# load the weights 
+sae_weights = torch.load(sae_path)
+
+# %%
+ckpt = {}
+for k in sae_weights['state_dict'].keys():
+    if k.startswith('sae_model.'):
+        ckpt[k.split(".")[1]] = sae_weights['state_dict'][k]
+ckpt.keys()
+
+# %%
+sae = SparseAutoencoder(256, 2048, 64, 64, 32, 200)
+sae.load_state_dict(ckpt)
+sae.to('cuda')
+
+# %%
 #@markdown ### **Imports**
 # diffusion policy import
 from typing import Tuple, Sequence, Dict, Union, Optional, Callable
@@ -65,68 +89,73 @@ policy_params = {
 policy = DiffusionTransformerLowdimPolicy(**policy_params)
 # Load the model weights
 policy.load_state_dict(state_dict['state_dicts']['model'])
-
 # %%
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from tqdm import tqdm
 import collections
 import random
-
 from diffusion_policy.env.pusht.pusht_keypoints_env import PushTKeypointsEnv
 policy.to('cuda')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # %%
-import torch
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from tqdm import tqdm
-import collections
-import random
 
 n_seeds = 20  # Number of random seeds to sweep
 seed_threshold = 10000
 obs_horizon = 2
 
 # Generate n_seeds random seeds greater than 10000
-seeds = [random.randint(seed_threshold + 1, 10 * seed_threshold) for _ in range(n_seeds)]
+# seeds = [random.randint(seed_threshold + 1, 10 * seed_threshold) for _ in range(n_seeds)]
+seeds = [78540,
+ 90318,
+ 40021,
+ 25426,
+ 50788,
+ 13783,
+ 37540,
+ 47567,
+ 10301,
+ 83703,
+ 95830,
+ 87380,
+ 41517,
+ 89203,
+ 33539,
+ 92410,
+ 30636,
+ 87390,
+ 52752,
+ 84098]
 
 # Dictionary to collect activations for each layer across all seeds
-all_layers_activations = {f"layer_{i}": [] for i in range(8)}
+# all_layers_activations = {f"layer_{i}": [] for i in range(8)}
 
-for seed in seeds:
+def intervene_with_sae(layer_num, sae):
+    def hook(module, input, output):
+        recons, auxk, num_dead = sae(output)
+        return recons
+    return hook
+
+layer_num = 4
+handle = policy.model.decoder.layers[layer_num].register_forward_hook(intervene_with_sae(layer_num, sae))
+for seed in seeds[2:]:
     # Initialize environment and model for each seed
     env = PushTKeypointsEnv()
     env.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     obs = env.reset()
-
+    imgs = []  #
     obs_deque = collections.deque([obs[:20]] * obs_horizon, maxlen=obs_horizon)
     done = False
     max_steps = 200
     step_idx = 0
     rewards = []
     policy.to('cuda')
-
-    # Temporary storage for activations for this seed
-    out_layers = {f"layer_{i}": [] for i in range(8)}
-
-    # Function to create hooks for each layer
-    def make_hook(layer_num):
-        def hook(module, input, output):
-            out_layers[f"layer_{layer_num}"].append(output)
-        return hook
-
-    # Register hooks for layers 0 through 7
-    handles = []
-    for i in range(8):
-        handle = policy.model.decoder.layers[i].register_forward_hook(make_hook(i))
-        handles.append(handle)
-
-    try:
+    try: 
         with tqdm(total=max_steps, desc=f"Seed {seed} Eval") as pbar:
             while not done:
                 B = 1
@@ -183,6 +212,7 @@ for seed in seeds:
                     obs, reward, done, _ = env.step(action[i])
                     obs_deque.append(obs[:20])
                     rewards.append(reward)
+                    imgs.append(env.render(mode='rgb_array'))
                     step_idx += 1
                     pbar.update(1)
                     if step_idx > max_steps:
@@ -190,29 +220,25 @@ for seed in seeds:
                     if done:
                         print(f"Reward for {seed}: ", max(rewards))
                         break
+
     finally:
         # Remove hooks
-        for handle in handles:
-            handle.remove()
+        handle.remove()
         torch.cuda.empty_cache()
-    
-    # Reshape and collect activations for each layer for this seed
-    for layer_name, activations in out_layers.items():
-        concatenated_activations = torch.cat(activations, dim=0).view(-1, 256)  # Shape: [variable_length, 256]
-        all_layers_activations[layer_name].append(concatenated_activations)
-    print(concatenated_activations.shape)
-
-# Concatenate activations across all seeds for each layer
-for layer_name, activations_list in all_layers_activations.items():
-    all_layers_activations[layer_name] = torch.cat(activations_list, dim=0)  # Shape: [total_activations, 256]
-
-# Save the activations for each layer to a dictionary
-torch.save(all_layers_activations, f'../data/all_layers_activations_{n_seeds}seeds.pt')
-print("Saved activations for layers 0 to 7 across all seeds.")
+    break
 
 # %%
-n_seeds = 20
-# load the activations back 
-all_layers_activations = torch.load(f'../data/all_layers_activations_{n_seeds}seeds.pt')
+from IPython.display import Video
+vwrite('out/lowdim_recons.mp4', imgs)
+Video('out/lowdim_recons.mp4', embed=True, width=256, height=256)
 
+
+# %%
+
+# define a random tensor of shape [1, 10, 256]
+x = torch.randn(1, 10, 256)
+recons, auxk, num_dead = sae(x)
+recons.shape, auxk.shape, num_dead
+# %%
+recons.shape
 # %%
