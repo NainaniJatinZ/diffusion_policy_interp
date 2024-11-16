@@ -12,7 +12,7 @@ seed2_acts = pd.read_csv("data/activations_summary_2.csv")
 feature_idx = 922
 top_10_activations = seed1_acts.sort_values(
     f"feature_{feature_idx}", ascending=False
-).head(10)
+).head(40)
 
 top_10_activations[['seed', 'step_idx', 'timestep', f'feature_{feature_idx}']]
 
@@ -20,7 +20,7 @@ top_10_activations[['seed', 'step_idx', 'timestep', f'feature_{feature_idx}']]
 
 top_10_activations = seed2_acts.sort_values(
     f"feature_{feature_idx}", ascending=False
-).head(10)
+).head(40)
 
 top_10_activations[['seed', 'step_idx', 'timestep', f'feature_{feature_idx}']]
 
@@ -89,6 +89,9 @@ policy_params = {
 policy = DiffusionTransformerLowdimPolicy(**policy_params)
 policy.load_state_dict(state_dict['state_dicts']['model'])
 policy.to('cuda')
+
+
+
 # %%
 
 top_10_activations = seed2_acts.sort_values(
@@ -138,4 +141,102 @@ plt.grid(True)
 plt.gca().set_aspect('equal', adjustable='box')
 
 plt.show()
+# %%
+
+env = PushTKeypointsEnv()
+env.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+obs = env.reset()
+imgs = []  #
+obs_deque = collections.deque([obs[:20]] * obs_horizon, maxlen=obs_horizon)
+done = False
+max_steps = 200
+step_idx = 0
+rewards = []
+policy.to('cuda')
+inference_inputs = {}
+try: 
+    with tqdm(total=max_steps, desc=f"Seed {seed} Eval") as pbar:
+        while not done:
+            B = 1
+            obs_seq = np.stack(obs_deque)
+            nobs = torch.from_numpy(obs_seq).unsqueeze(0).to('cuda', dtype=torch.float32)
+
+            with torch.no_grad():
+                # Normalization and action inference logic from your code
+                nobs = policy.normalizer['obs'].normalize(nobs)
+                B, _, Do = nobs.shape
+                To = policy.n_obs_steps
+                T = policy.horizon
+                Da = policy.action_dim
+                device = policy.device
+                dtype = policy.dtype
+                cond = nobs[:, :To]
+
+                shape = (B, T, Da)
+                if policy.pred_action_steps_only:
+                    shape = (B, policy.n_action_steps, Da)
+                cond_data = torch.zeros(size=shape, device=device, dtype=dtype)
+                cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
+
+                generator = None
+                trajectory = torch.randn(
+                    size=cond_data.shape, 
+                    dtype=cond_data.dtype,
+                    device=cond_data.device,
+                    generator=generator)
+        
+                policy.noise_scheduler.set_timesteps(policy.num_inference_steps)
+
+                inference_inputs[step_idx] = []
+
+                for t in policy.noise_scheduler.timesteps:
+                    trajectory[cond_mask] = cond_data[cond_mask]
+                    step_input = {
+                        "timestep": t,
+                        "trajectory_input": trajectory.clone().cpu().numpy().tolist(),
+                        "cond_input": cond.clone().cpu().numpy().tolist()
+                    }
+                    
+                    # Append to this timestep's entry in the seed dictionary
+                    inference_inputs[step_idx].append(step_input)
+
+                    model_output = policy.model(trajectory, t, cond)
+
+                    trajectory = policy.noise_scheduler.step(
+                        model_output, t, trajectory, 
+                        generator=generator,
+                        **policy.kwargs
+                    ).prev_sample
+
+                trajectory[cond_mask] = cond_data[cond_mask]
+                naction_pred = trajectory[..., :Da]
+                action_pred = policy.normalizer['action'].unnormalize(naction_pred)
+
+                start = To - 1
+                end = start + policy.n_action_steps
+                action = action_pred[:, start:end]
+
+            naction = action.detach().to('cpu').numpy()
+            action = naction[0]
+
+            for i in range(len(action)):
+                obs, reward, done, _ = env.step(action[i])
+                obs_deque.append(obs[:20])
+                rewards.append(reward)
+                imgs.append(env.render(mode='rgb_array'))
+                step_idx += 1
+                pbar.update(1)
+                if step_idx > max_steps:
+                    done = True
+                if done:
+                    print(f"Reward for {seed}: ", max(rewards))
+                    break
+    torch.save(inference_inputs, f"data/inference_inputs_seed_{seed}.pt")
+finally:
+    # Remove hooks
+    # handle.remove()
+    torch.cuda.empty_cache()
+
 # %%
