@@ -22,3 +22,4 @@ data/*
 
 # all log files
 sae/logs/*
+**/out/
