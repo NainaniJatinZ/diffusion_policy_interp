@@ -12,9 +12,9 @@ def display_image_pairs(image_paths1, image_paths2):
     for img1, img2 in zip(image_paths1, image_paths2):
         col1, col2 = st.columns(2)
         with col1:
-            st.image(img1, use_contained_width=True)
+            st.image(img1)
         with col2:
-            st.image(img2, use_contained_width=True)
+            st.image(img2)
 
 # Set up the Streamlit interface
 st.title("Diffusion Policy SAE Feature Viz")
