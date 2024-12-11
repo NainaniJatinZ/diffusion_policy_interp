@@ -30,6 +30,10 @@ csv_directory = "sae_analysis/out/new/"  # Update with your CSV folder path
 csv_files = {int(f.split('_')[0][1:]): os.path.join(csv_directory, f) for f in os.listdir(csv_directory) if f.endswith('_stats.csv')}
 feature_indices = sorted(csv_files.keys())[1:]
 
+# read the descriptions json
+import json
+with open('sae_analysis/out/descriptions/new.json') as f:
+    descriptions = json.load(f)
 
 # Searchable dropdown for feature index selection
 selected_idx = st.sidebar.selectbox("Select Feature Index", feature_indices)
@@ -42,13 +46,21 @@ if selected_idx:
     # Display the numerical columns
     st.header(f"Feature Index {selected_idx} - Data Table")
 
-    st.write("Semantic Description: In progress...")
+    if str(selected_idx) in descriptions:
+        st.write(f"Semantic Description: {descriptions[str(selected_idx)]}")
+    else:
+        st.write("Semantic Description: In progress...")
 
     numerical_columns = data.select_dtypes(include=['number'])
     st.dataframe(numerical_columns)
 
+    st.header("Steering")
+    # if st.button("Steer this feature!"):
+    #     pass
+    st.write("In progress, I dont know how to run the models in streamlit yet.")
+
     # Display the image pairs
-    if 'img_path_in' in data.columns and 'img_path_out' in data.columns and selected_idx not in [2, 922]:
+    if 'img_path_in' in data.columns and 'img_path_out' in data.columns and selected_idx not in [2]:
         st.header("Image Pairs (Left: Input Actions, Right: Output Actions)")
         image_paths1 = data['img_path_in'].tolist()
         image_paths2 = data['img_path_out'].tolist()
