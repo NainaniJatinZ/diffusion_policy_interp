@@ -42,11 +42,11 @@ if selected_idx:
     numerical_columns = data.select_dtypes(include=['number'])
     st.dataframe(numerical_columns)
 
-    # # Display the image pairs
-    # if 'image_path1' in data.columns and 'image_path2' in data.columns:
-    #     st.header("Image Pairs")
-    #     image_paths1 = data['image_path1'].tolist()
-    #     image_paths2 = data['image_path2'].tolist()
-    #     display_image_pairs(image_paths1, image_paths2)
-    # else:
-    #     st.warning("Image columns not found in this dataset.")
+    # Display the image pairs
+    if 'img_path_in' in data.columns and 'img_path_out' in data.columns:
+        st.header("Image Pairs")
+        image_paths1 = data['img_path_in'].tolist()
+        image_paths2 = data['img_path_out'].tolist()
+        display_image_pairs(image_paths1, image_paths2)
+    else:
+        st.warning("Image columns not found in this dataset.")
