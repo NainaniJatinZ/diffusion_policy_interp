@@ -19,9 +19,10 @@ def display_image_pairs(image_paths1, image_paths2):
 # Set up the Streamlit interface
 st.title("Diffusion Policy SAE Feature Viz")
 st.sidebar.title("Options")
-
+# print current dir
+print(os.getcwd())
 # Specify the directory containing the CSV files
-csv_directory = "../sae_analysis/out/new/"  # Update with your CSV folder path
+csv_directory = "sae_analysis/out/new/"  # Update with your CSV folder path
 
 # Get a list of feature indices (based on available CSV files)
 csv_files = {int(f.split('_')[0][1:]): os.path.join(csv_directory, f) for f in os.listdir(csv_directory) if f.endswith('_stats.csv')}
