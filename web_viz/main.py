@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from PIL import Image
+import json
 
 # Function to load data from a selected CSV
 def load_data(file_path):
@@ -21,8 +22,10 @@ st.title("Diffusion Policy SAE Feature Viz")
 st.write("Sparse Autoencoders are a way to look inside the model and find interpretable units of computation that the model uses. Each unit/feature is supposed to be interpretable and monosemantic (representing a single thing).")
 st.write("The tables are numerical analysis of the environment and actions (angle, distance, etc) while the image pairs show the environment states where it activates the most.")
 st.sidebar.title("Options")
-# print current dir
+
+# Print current directory (for debugging)
 print(os.getcwd())
+
 # Specify the directory containing the CSV files
 csv_directory = "sae_analysis/out/new/"  # Update with your CSV folder path
 
@@ -30,13 +33,26 @@ csv_directory = "sae_analysis/out/new/"  # Update with your CSV folder path
 csv_files = {int(f.split('_')[0][1:]): os.path.join(csv_directory, f) for f in os.listdir(csv_directory) if f.endswith('_stats.csv')}
 feature_indices = sorted(csv_files.keys())[1:]
 
-# read the descriptions json
-import json
+# Read the descriptions JSON
 with open('sae_analysis/out/descriptions/new.json') as f:
     descriptions = json.load(f)
 
-# Searchable dropdown for feature index selection
+# Define featured feature indices
+featured_indices = [7, 206, 922]  # Replace with your desired indices
+st.sidebar.write("### Featured Feature Indices")
+
+# Handle clicks for featured indices
+clicked_feature = None
+for idx in featured_indices:
+    if st.sidebar.button(f"Feature {idx}"):
+        clicked_feature = idx
+
+# Searchable dropdown for general feature index selection
+st.sidebar.write("### All Feature Indices")
 selected_idx = st.sidebar.selectbox("Select Feature Index", feature_indices)
+# Determine which feature index is selected
+if clicked_feature:
+    selected_idx = clicked_feature # Prioritize featured index selection
 
 # Load the data for the selected feature index
 if selected_idx:
@@ -67,3 +83,4 @@ if selected_idx:
         display_image_pairs(image_paths1, image_paths2)
     else:
         st.warning("Image columns not found in this dataset.")
+
