@@ -1,0 +1,5 @@
+Loading conda
+Traceback (most recent call last):
+  File "/work/pi_hzhang2_umass_edu/jnainani_umass_edu/diffusion_policy_interp/sae_analysis/dashboard_gen.py", line 4, in <module>
+    from sae.sae_model import SparseAutoencoder
+ModuleNotFoundError: No module named 'sae'
