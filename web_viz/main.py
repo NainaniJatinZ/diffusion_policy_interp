@@ -38,7 +38,7 @@ with open('sae_analysis/out/descriptions/new.json') as f:
     descriptions = json.load(f)
 
 # Define featured feature indices
-featured_indices = [7, 206, 922]  # Replace with your desired indices
+featured_indices = [7, 206, 922, 1198, 2043, 2037, 2029, 2025]  # Replace with your desired indices
 st.sidebar.write("### Featured Feature Indices")
 
 # Handle clicks for featured indices
